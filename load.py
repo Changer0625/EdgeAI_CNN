@@ -116,7 +116,7 @@ class WESAD:
     #     result = pd.concat(rows, ignore_index=True)
     #     return result
 
-    def rolling_window_apply(self, feature:pd.Series, function_pipeline:feat.FunctionPipeline, window_size:int, shift:int=3500) -> Iterator[pd.Series]:
+    def rolling_window_apply(self, feature:pd.Series, function_pipeline:feat.FunctionPipeline, window_size:int, shift:int=7000) -> Iterator[pd.Series]:
         """ 
         intuitively the space taken will be O(n), >haven't confirmed<
         runtime will still be O(N * length * applied_func_complexity),
