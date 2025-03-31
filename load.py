@@ -135,25 +135,21 @@ class WESAD:
         for _, row in rows.iterrows():
             yield row
     
-    def feature_extraction(self, data:pd.DataFrame, sample_n:int, window_size:int,
-                           cols:List[str]=['label', 'subject', 'ACC_0', 'ACC_1', 'ACC_2', 'ECG', 'EMG', 'EDA', 'Resp', 'Temp'], 
-                           ) -> pd.DataFrame:
-        # TODO:
-        # 1. (Optional) change lambdas to partials
-        # 3. (Optional) add multithreading, preferably outside of this function
-        # 4. (Optional) make better cols initialization
+
+    def feature_extraction(self, data: pd.DataFrame, sample_n: int, window_size: int,
+                        cols: List[str] = ['label', 'subject', 'ACC_0', 'ACC_1', 'ACC_2', 'ECG', 'EMG', 'EDA', 'Resp', 'Temp']
+                        ) -> np.ndarray:
         signal = data
-        features = pd.DataFrame()
+        feature_list = []
+
         for key in cols:
-            # get signal
             col_signal = signal[key]
 
-            # get processor
+            # 選擇處理方法
             if key == 'subject':
-                decorator =  feat.FunctionPipeline([lambda x, kwargs: x.value_counts().idxmax()], [dict()])
+                decorator = feat.FunctionPipeline([lambda x, kwargs: x.value_counts().idxmax()], [dict()])
                 col_names = [key]
             elif key == 'label':
-                # continue # debug purposes >>DEBUG<<
                 decorator = feat.FunctionPipeline([lambda x, kwargs: x.value_counts().idxmax()], [dict()])
                 col_names = [key]
             elif key == 'ECG':  
@@ -167,28 +163,33 @@ class WESAD:
                 ])
                 col_names = [f"ECG_{feat}" for feat in ['ULF', 'LF', 'HF', 'UHF']]
             else:
-                decorator = feat.FunctionPipeline([lambda x, kwargs: (np.std(x), np.mean(x))],[dict()])
+                decorator = feat.FunctionPipeline([lambda x, kwargs: (np.std(x), np.mean(x))], [dict()])
                 col_names = [f"std_{key}", f"mean_{key}"]
 
-            # apply processor
-            for col, col_name in zip(self.rolling_window_apply(col_signal, decorator, window_size=window_size), col_names):
-                features[col_name] = col
-        return features
-    
-    def separate_and_feature_extract(self, sample_n:int, window_size:int=7000,
-                           cols:List[str]=['label', 'subject', 'ACC_0', 'ACC_1', 'ACC_2', 'ECG', 'EMG', 'EDA', 'Resp', 'Temp'], 
-                           ) -> pd.DataFrame:
-        df = self.group2(self._df, sample_n=sample_n).loc[:,cols] # NOTE: why need loc[:, cols], in a perfect world cols shouldn't be here
-        df_group = df.groupby(['label','subject'])
-        
+            # 應用處理方法
+            extracted_features = [col for col in self.rolling_window_apply(col_signal, decorator, window_size=window_size)]
+            feature_list.append(np.column_stack(extracted_features))  # 堆疊成 (window_size, 特徵數)
+
+        # 拼接所有特徵，形狀變為 (window_size, feature_count)
+        feature_array = np.concatenate(feature_list, axis=1)
+        return feature_array
+
+
+    def separate_and_feature_extract(self, sample_n: int, window_size: int = 7000,
+                                    cols: List[str] = ['label', 'subject', 'ACC_0', 'ACC_1', 'ACC_2', 'ECG', 'EMG', 'EDA', 'Resp', 'Temp']
+                                    ) -> np.ndarray:
+        df = self.group2(self._df, sample_n=sample_n).loc[:, cols]  # 只選擇需要的列
+        df_group = df.groupby(['label', 'subject'])
+
         extracted_features = []
         for _, g in df_group:
             extracted_feature = self.feature_extraction(g, sample_n=sample_n, window_size=window_size)
-            extracted_features.append(extracted_feature)
-        
-        features = pd.concat(extracted_features, ignore_index=True)
+            extracted_features.append(extracted_feature)  # 每個 group 變成 (window_size, features)
 
-        return features
+        # 最終輸出形狀: (batch_size, window_size, feature_count)
+        features_array = np.array(extracted_features)
+        return features_array
+
 
 
     ## ENDOF Feature Extraction
