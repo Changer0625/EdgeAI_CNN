@@ -148,10 +148,10 @@ class WESAD:
             # 選擇處理方法
             if key == 'subject':
                 decorator = feat.FunctionPipeline([lambda x, kwargs: x.value_counts().idxmax()], [dict()])
-                col_names = [key]
+                # col_names = [key]
             elif key == 'label':
                 decorator = feat.FunctionPipeline([lambda x, kwargs: x.value_counts().idxmax()], [dict()])
-                col_names = [key]
+                # col_names = [key]
             elif key == 'ECG':  
                 decorator = feat.FunctionPipeline([
                     lambda x, kwargs: feat.ButterBandpass()(x, **kwargs),
@@ -161,10 +161,10 @@ class WESAD:
                     dict(lowcut=10, highcut=30, fs=70),
                     dict(sampling_rate=700)
                 ])
-                col_names = [f"ECG_{feat}" for feat in ['ULF', 'LF', 'HF', 'UHF']]
+                # col_names = [f"ECG_{feat}" for feat in ['ULF', 'LF', 'HF', 'UHF']]
             else:
                 decorator = feat.FunctionPipeline([lambda x, kwargs: (np.std(x), np.mean(x))], [dict()])
-                col_names = [f"std_{key}", f"mean_{key}"]
+                # col_names = [f"std_{key}", f"mean_{key}"]
 
             # 應用處理方法
             extracted_features = [col for col in self.rolling_window_apply(col_signal, decorator, window_size=window_size)]
