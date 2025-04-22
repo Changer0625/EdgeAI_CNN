@@ -14,7 +14,12 @@ def load_model(prototype_path:str, model_path:str) -> cv2.dnn_Net:
         print('Success model load')
     return net
 
-def create_video_writer(output_path:str) -> cv2.VideoWriter:
+def create_video_writer(output_path:str, video_capture:cv2.VideoCapture) -> cv2.VideoWriter:
+    """
+    Parameter:
+        output_path (str): result video path
+        video_capture (cv2.VideoCapture): video_capture to get video attributes
+    """
     writer = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'MP4V'), 30, (int(video_capture.get(3)), int(video_capture.get(4))), True)
     return writer
 
@@ -26,7 +31,7 @@ def video_iterable(cap:cv2.VideoCapture) -> Iterator[Tuple[bool, Optional[np.nda
         yield ret, frame
 
 class coordinate_rectangle():
-    def __init__(self, start_x, start_y, end_x, end_y):
+    def __init__(self, start_x:int, start_y:int, end_x:int, end_y:int):
         self.start_x = start_x
         self.start_y = start_y
         self.end_x = end_x
@@ -56,11 +61,11 @@ def door_status_check_open(door_frame:np.ndarray, door_color_threshold:int) -> b
     Returns:
     True if door is open, otherwise False
     """
-    door_mean_color = np.mean(door_roi, axis=(0,1))
+    door_mean_color = np.mean(door_frame, axis=(0,1))
     elevator_doors_open = door_mean_color[1] - door_mean_color[0] > door_color_threshold
     return elevator_doors_open
 
-def count_people(frame:np.ndarray, model:cv2.dnn_Net, elevator_doors_open:bool) -> Tuple[int, int]:
+def count_people(frame:np.ndarray, roi_rect:coordinate_rectangle, elevator_rect:coordinate_rectangle, model:cv2.dnn_Net, elevator_doors_open:bool) -> Tuple[int, int]:
     # Get input for model + run model
     roi = frame[roi_rect.start_y:roi_rect.end_y, roi_rect.start_x:roi_rect.end_x] # ROI frame
     blob = cv2.dnn.blobFromImage(roi, 0.007843, (300, 300), 127.5, swapRB=True) # network input
@@ -98,7 +103,7 @@ def main():
     #I/O
     video_capture = load_video(INPUT_VIDEO_PATH)
     model = load_model(MODEL_PROTOTYPE_PATH,MODEL_PATH)
-    output_video_writer = create_video_writer(OUTPUT_VIDEO_PATH)
+    output_video_writer = create_video_writer(OUTPUT_VIDEO_PATH, video_capture)
 
     #Manual Parameters
     roi_rect = coordinate_rectangle(160, 80, 730, 500) #region of interest (ROI), coordinates of video where we want to process
@@ -109,6 +114,8 @@ def main():
     #Main functionality
     max_total_people = 0
     max_internal_people = 0 #people count inside elevator, uses max because some people may be undetected after being detected previously
+    previous_door_open = False
+    final_closed = False
     for ret, frame in video_iterable(video_capture):
         # Region of interest
         put_rectangle(frame, roi_rect, 255, 255, 0) # Yellow: All ROI
@@ -117,19 +124,29 @@ def main():
         # Get door status
         door_roi = frame[door_y-door_side_length:door_y+door_side_length, door_x-door_side_length:door_x+door_side_length] # get elevator roi frame
         elevator_doors_open = door_status_check_open(door_roi, door_color_threshold) # get elevator door status
-        
-        # Detect people function
-        external_people, internal_people = count_people(frame, model, elevator_doors_open) # Count external, internal people, also puts rectangle when detected
 
-        # Process model result
-        max_total_people = max(max_total_people, external_people+internal_people)
-        if not elevator_doors_open:
-            external_people = max_total_people
-            internal_people = 0
-        else:
-            internal_people = max(internal_people, max_total_people-external_people)
-            max_internal_people = max(max_internal_people, internal_people)
-            external_people = max_total_people-max_internal_people # Hakuna matata
+        #　Final state
+        if not elevator_doors_open and previous_door_open:
+            final_closed = True
+            internal_people = max_total_people
+            external_people = 0
+        
+        #　Non final state
+        if not final_closed:
+            previous_door_open = elevator_doors_open
+            
+            # Detect people function
+            external_people, internal_people = count_people(frame, roi_rect, elevator_rect, model, elevator_doors_open) # Count external, internal people, also puts rectangle when detected
+
+            # Process model result
+            max_total_people = max(max_total_people, external_people+internal_people)
+            if not elevator_doors_open:
+                external_people = max_total_people
+                internal_people = 0
+            else:
+                internal_people = max(internal_people, max_total_people-external_people)
+                max_internal_people = max(max_internal_people, internal_people)
+                external_people = max_total_people-max_internal_people # Hakuna matata
 
         # Final report
         text = f'Door Status: {"Open" if elevator_doors_open else "Close"}' 
