@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Elevator Status</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background-color: #0d0c1d;
+      color: #f4f4f4;
+      font-family: 'Orbitron', sans-serif;
+      margin: 0;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #a5c9ff;
+      margin-bottom: 40px;
+    }
+
+    .card-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .card {
+      background: #1e2a38;
+      border: 2px solid #6c88c4;
+      box-shadow: 0 0 10px #6c88c455;
+      border-radius: 16px;
+      padding: 20px;
+      width: 260px;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .label {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-top: 10px;
+      color: #a5c9ff;
+    }
+    
+
+    .value {
+      font-size: 1.8rem;
+      margin-top: 6px;
+      color: #ffffff;
+    }
+
+    svg {
+      width: 60px;
+      height: 60px;
+      stroke: #a5c9ff;
+      fill: none;
+      stroke-width: 1.8;
+      margin-bottom: 10px;
+    }
+
+    .door-open {
+      font-size: 1.8rem;
+      margin-top: 6px;
+      stroke: #00ff5e;
+      color: #00ff5e; /* 綠色 */
+    }
+    
+    .door-closed {
+      font-size: 1.8rem;
+      margin-top: 6px;
+      stroke: #ff4040;
+      color: #ff4040; /* 紅色 */
+    }
+    
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .card {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Elevator Status</h1>
+  <div id="timestamp" class="value">{{ timestamp }}</div>
+
+  <div class="card-container">
+
+    <!-- 電梯門 -->
+    <div class="card">
+      <svg id="door-icon" class="door-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10"/><script xmlns=""/></svg>
+      <div class="label">DOOR</div>
+      <div id="door" class="value">{{ door }}</div>
+    </div>
+
+    <!-- 電梯內人數 -->
+    <div class="card">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-log-in"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/><script xmlns=""/></svg>
+      <div class="label">INSIDE</div>
+      <div class="value" id="inside">{{ inside }}</div>
+    </div>
+
+    <!-- 電梯外人數 -->
+    <div class="card">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-log-out"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/><script xmlns=""/></svg>
+      <div class="label">OUTSIDE</div>
+      <div class="value" id="outside">{{ outside }}</div>
+    </div>
+
+  </div>
+</body>
+
+<script>
+  doorIcon =  document.getElementById('door-icon');
+  function fetchStatus() {
+      fetch('/get_data')
+          .then(response => response.json())
+          .then(data => {
+              if (!data.error) {
+                  document.getElementById('outside').textContent = data.external_people;
+                  document.getElementById('inside').textContent = data.internal_people;
+                  if(data.door_status == 0)
+                  {
+                    document.getElementById('door').textContent = "CLOSE";
+                    doorIcon.classList.remove('door-open');
+                    doorIcon.classList.add('door-closed');
+                  }
+                  else
+                  {
+                    document.getElementById('door').textContent = "OPEN";
+                    doorIcon.classList.remove('door-closed');
+                    doorIcon.classList.add('door-open');
+                  }
+                  document.getElementById('timestamp').textContent = data.timestamp;
+              }
+          });
+  }
+
+  // 每秒自動更新
+  setInterval(fetchStatus, 200);
+
+  // 初始載入
+  fetchStatus();
+</script>
+</html>
